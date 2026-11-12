@@ -31,6 +31,18 @@ COMPETING_GENES = {
     ]
 }
 
+# Дифференциальные диагнозы для сценария 1 (case_06) — РЕАЛЬНЫЕ гены
+DIFFERENTIAL_DIAGNOSES = {
+    "case_06": [
+        {"gene": "TGFBR2", "chrom": "chr3", "score": 90,
+         "reason": "Полное фенотипическое совпадение с Loeys-Dietz syndrome"},
+        {"gene": "SMAD3", "chrom": "chr15", "score": 45,
+         "reason": "LDS type 3: объясняет аневризмы, но не краниосиностоз и bifid uvula"},
+        {"gene": "FBN1", "chrom": "chr15", "score": 20,
+         "reason": "Marfan syndrome: исключён — нет вывиха хрусталика и высокого роста"},
+    ]
+}
+
 if 'demo_mode' not in st.session_state:
     st.session_state.demo_mode = False
 if 'demo_case' not in st.session_state:
@@ -92,14 +104,15 @@ def render_evidence(evidence):
     if not evidence['hypotheses']: st.markdown("- *Фенотипическое совпадение низкое*")
 
 # ==========================================
-# ДЕМО-РЕЖИМ (полное покрытие сценариев)
+# ДЕМО-РЕЖИМ
 # ==========================================
 def run_demo(case_id):
     kb = KNOWLEDGE_BASE[case_id]
     st.markdown(f"### 🎭 Демо: {case_id} | Сценарий {kb['scenario']} | {kb['disease']}")
 
-    # Сценарий 3: недостаточность данных
+    # Сценарий 3: недостаточность данных (ДЕМО)
     if kb["scenario"] == 3:
+        st.warning("⚠️ **Это демонстрационный сценарий**, смоделированный для показа обработки неопределённости (требование 6 из ТЗ).")
         st.error("""
         ⚪ **Убедительного кандидата не найдено.**
         - Максимальный скор < 30
@@ -119,16 +132,12 @@ def run_demo(case_id):
         st.info("🔀 **Сценарий 2: Несколько конкурирующих гипотез.** Система ранжирует кандидатов и объясняет различия в доказательствах.")
         candidates = COMPETING_GENES.get(case_id, [])
     else:
-        # Сценарий 1: моногенное
+        # Сценарий 1: моногенное — используем реальные дифференциальные диагнозы
         st.success("🎯 **Сценарий 1: Редкое моногенное заболевание.** Система выделяет ведущий кандидат.")
-        candidates = [
+        candidates = DIFFERENTIAL_DIAGNOSES.get(case_id, [
             {"gene": kb["gene"], "chrom": kb["chrom"], "score": 90,
              "reason": f"Полное фенотипическое совпадение с {kb['disease']}"},
-            {"gene": "GENE_X", "chrom": "chr1", "score": 35,
-             "reason": "Частичное совпадение (2 из 6 симптомов)"},
-            {"gene": "GENE_Y", "chrom": "chr5", "score": 15,
-             "reason": "VUS, низкое фенотипическое совпадение"},
-        ]
+        ])
 
     # Рендеринг кандидатов
     for i, c in enumerate(candidates):
@@ -137,17 +146,21 @@ def run_demo(case_id):
             col1, col2 = st.columns([1, 2])
             with col1:
                 st.metric("Composite Score", f"{c['score']}/100")
+                
+                # Корректный расчёт числа симптомов (не больше 6)
+                num_symptoms = min(int(c['score'] / 15), 6)
+                
                 evidence = {
                     "facts": [f"Ген {c['gene']} — {c['reason']}."],
                     "predictions": ["CADD > 25", "gnomAD AF < 0.0001"] if c["score"] > 40 else ["Данные ограничены"],
-                    "hypotheses": [f"Объясняет {int(c['score']/10)} из 6 ключевых симптомов."] if c["score"] > 40 else ["Низкое совпадение"],
+                    "hypotheses": [f"Объясняет {num_symptoms} из 6 ключевых симптомов."] if c["score"] > 40 else ["Низкое совпадение"],
                 }
                 render_evidence(evidence)
             with col2:
                 st.markdown("#### 🧬 Детали")
                 st.markdown(f"**Хромосома:** {c['chrom']}  \n**Ген:** {c['gene']}  \n**Скор:** {c['score']}")
 
-    # СРАВНЕНИЕ С ИЗВЕСТНЫМ ОТВЕТОМ (требование из PDF)
+    # СРАВНЕНИЕ С ИЗВЕСТНЫМ ОТВЕТОМ
     st.markdown("---")
     st.markdown("### ✅ Сравнение с известным ответом (контрольный случай)")
     expected = kb["gene"]
@@ -226,7 +239,7 @@ else:
     st.info("👈 Загрузите файлы или используйте демо ниже.")
 
     st.markdown("---")
-    st.markdown("### 🎭 Демо-режим: все 6 кейсов + 3 сценария")
+    st.markdown("### 🎭 Демо-режим: 6 реальных кейсов + 3 сценария")
     st.markdown("Выберите кейс, чтобы увидеть работу системы на **трёх пользовательских сценариях** из ТЗ:")
 
     demo_choice = st.selectbox(
@@ -239,7 +252,7 @@ else:
             "case_04": "Case 04 — Моногенное (FGFR2, синдром Апера)",
             "case_05": "Case 05 — Моногенное (LMNA, мандибулоакральная дисплазия)",
             "case_06": "Case 06 — Моногенное (TGFBR2, синдром Луи-Дица)",
-            "case_07_no_data": "Case 07 — ❓ Недостаточность данных (сценарий 3)",
+            "case_07_no_data": "🎭 ДЕМО: Недостаточность данных (сценарий 3, искусственный)",
         }[x]
     )
 
